@@ -14,7 +14,7 @@ motion_angle = 0
 motion_length = 15
 filter_strength = 16
 
-img_path = r"me.jpg"
+img_path = r"./images/me.jpg"
 img = cv2.imread(img_path)
 if img is None:
     raise FileNotFoundError(f"تصویر {img_path} پیدا نشد")
