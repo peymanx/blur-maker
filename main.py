@@ -98,7 +98,7 @@ def apply_effect():
         current_value.set(f"Strength: {filter_strength}")
     elif effect_mode.get()=="edge":
         gray = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY)
-        edges = cv2.Canny(gray,100,200)
+        edges = cv2.Canny(gray,100,200)  # همان قبلی؛ تغییری نمی‌دهیم
         roi_effect = cv2.cvtColor(edges, cv2.COLOR_GRAY2BGR)
         method_name = "Max (Edge)"
         current_value.set(f"Strength: {filter_strength}")
@@ -107,10 +107,12 @@ def apply_effect():
         method_name = "Median"
         current_value.set(f"Strength: {filter_strength}")
     elif effect_mode.get()=="motion":
-        k = motion_blur_kernel(motion_length, motion_angle)
+        # طول کرنل را به strength وصل می‌کنیم (حداقل 3)
+        length = max(3, int(filter_strength))
+        k = motion_blur_kernel(length, motion_angle)
         roi_effect = cv2.filter2D(roi,-1,k)
         method_name = "Motion Blur"
-        current_value.set(f"Angle: {motion_angle}")
+        current_value.set(f"Length: {length}, Angle: {motion_angle}")
     elif effect_mode.get()=="liquid":
         blur = cv2.GaussianBlur(roi,(filter_strength|1,filter_strength|1),0)
         warped = apply_convex_effect(blur)
@@ -128,6 +130,17 @@ def apply_effect():
         roi_effect = np.clip(base_float + reflection*0.15,0,255).astype(np.uint8)
         method_name = "Liquid Glass"
         current_value.set(f"Strength: {filter_strength}")
+    elif effect_mode.get()=="sharp":
+        # کرنل شارپ وابسته به strength + نرمال‌سازی برای حفظ روشنایی
+        amount = float(filter_strength) / 20.0  # ضریب قابل تنظیم با اسلایدر
+        kernel = np.array([[0, -1, 0],
+                           [-1, 5 + amount, -1],
+                           [0, -1, 0]], dtype=np.float32)
+        kernel /= (1.0 + amount)  # حفظ مجموع کرنل ≈ 1
+        roi_effect = cv2.filter2D(roi, -1, kernel)
+        method_name = "Sharpen"
+        current_value.set(f"Strength: {filter_strength}")
+        k = kernel
     else:
         roi_effect = roi
         method_name = "None"
@@ -207,8 +220,15 @@ ctrl_frame = ttk.Frame(root)
 ctrl_frame.pack(side="right", fill="y", padx=10, pady=10)
 
 ttk.Label(ctrl_frame,text="Filter:").pack()
-filters = [("Gaussian Blur","gaussian"),("Box Blur","box"),("Median","median"),
-           ("Edge","edge"),("Motion Blur","motion"),("Liquid Glass","liquid")]
+filters = [
+    ("Gaussian Blur","gaussian"),
+    ("Box Blur","box"),
+    ("Median","median"),
+    ("Edge","edge"),
+    ("Motion Blur","motion"),
+    ("Liquid Glass","liquid"),
+    ("Sharpen","sharp")
+]
 for t,v in filters:
     ttk.Radiobutton(ctrl_frame,text=t,variable=effect_mode,value=v,command=apply_effect).pack(anchor="w")
 
@@ -238,7 +258,7 @@ label_kernel = ttk.Label(ctrl_frame,text="Kernel 3x3:"); label_kernel.pack(pady=
 
 def shortcut(event):
     key = event.char
-    mapping = {"1":"gaussian","2":"box","3":"median","4":"edge","5":"motion","6":"liquid"}
+    mapping = {"1":"gaussian","2":"box","3":"median","4":"edge","5":"motion","6":"liquid","7":"sharp"}
     if key in mapping:
         effect_mode.set(mapping[key])
         apply_effect()
